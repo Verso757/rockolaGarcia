@@ -39,8 +39,16 @@ export default function App() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('mode') === 'guest') {
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      const isMobileScreen = window.innerWidth <= 768;
+
+      // Open directly in mobile/guest mode if launched as PWA or on phone
+      if (params.get('mode') === 'guest' || isStandalone || (isMobileScreen && params.get('mode') !== 'tv')) {
         setMode('guest');
+      } else if (params.get('mode') === 'tv') {
+        setMode('tv');
       }
 
       setTvUrl(window.location.origin);

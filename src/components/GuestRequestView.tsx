@@ -17,6 +17,7 @@ import { sounds } from '../utils/audioEffects';
 import { ThemeModal } from './ThemeModal';
 import { THEMES } from '../utils/themeStyles';
 import { PWAInstallButton } from './PWAInstallButton';
+import { searchYouTubeUniversal } from '../utils/youtubeSearch';
 
 interface GuestRequestViewProps {
   roomState: RockolaRoomState;
@@ -86,11 +87,8 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
 
     setIsSearchingYt(true);
     try {
-      const res = await fetch(`/api/youtube-search?q=${encodeURIComponent(term.trim())}`);
-      const data = await res.json();
-      if (res.ok && data.results) {
-        setYtSearchResults(data.results);
-      }
+      const results = await searchYouTubeUniversal(term);
+      setYtSearchResults(results);
     } catch {
       // ignore
     } finally {

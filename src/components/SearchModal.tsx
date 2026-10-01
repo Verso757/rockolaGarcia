@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Loader2, Sparkles, History, Music } from 'lucide-react';
 import { PlayedSongRecord } from '../types';
 import { sounds } from '../utils/audioEffects';
+import { searchYouTubeUniversal } from '../utils/youtubeSearch';
 
 interface SearchModalProps {
   history: PlayedSongRecord[];
@@ -61,11 +62,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({ history, onClose, onAd
 
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/youtube-search?q=${encodeURIComponent(term.trim())}`);
-      const data = await res.json();
-      if (res.ok && data.results) {
-        setResults(data.results);
-      }
+      const data = await searchYouTubeUniversal(term);
+      setResults(data);
     } catch {
       // ignore
     } finally {

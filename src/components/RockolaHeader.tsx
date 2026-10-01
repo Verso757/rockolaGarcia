@@ -3,7 +3,6 @@ import { Search, Cast, Monitor, Smartphone, Palette } from 'lucide-react';
 import { sounds } from '../utils/audioEffects';
 import { RockolaTheme } from '../types';
 import { THEMES } from '../utils/themeStyles';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface RockolaHeaderProps {
   name: string;
@@ -77,9 +76,6 @@ export const RockolaHeader: React.FC<RockolaHeaderProps> = ({
             <Cast className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">TV</span>
           </button>
-
-          {/* Botón Instalar PWA */}
-          <PWAInstallButton className="hidden md:flex" />
 
           {/* Selector TV / Celular */}
           <div className="flex items-center rounded-xl border border-[#8b6528]/50 bg-[#120804] p-0.5 shadow-inner">
