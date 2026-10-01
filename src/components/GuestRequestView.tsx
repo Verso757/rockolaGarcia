@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SongItem, RockolaRoomState } from '../types';
+import { SongItem, RockolaRoomState, RockolaTheme } from '../types';
 import {
   Search,
   Plus,
@@ -11,9 +11,12 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
-  History,
+  Palette,
 } from 'lucide-react';
 import { sounds } from '../utils/audioEffects';
+import { ThemeModal } from './ThemeModal';
+import { THEMES } from '../utils/themeStyles';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface GuestRequestViewProps {
   roomState: RockolaRoomState;
@@ -21,6 +24,7 @@ interface GuestRequestViewProps {
   onMoveToTop: (songId: string) => void;
   onPlayPauseToggle: (playing: boolean) => void;
   onNextSong: () => void;
+  onSelectTheme?: (theme: RockolaTheme) => void;
   onOpenCast?: () => void;
   onBackToTV?: () => void;
 }
@@ -38,6 +42,7 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
   onAddSong,
   onPlayPauseToggle,
   onNextSong,
+  onSelectTheme,
   onOpenCast,
   onBackToTV,
 }) => {
@@ -48,7 +53,10 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
   const [smartSuggestions, setSmartSuggestions] = useState<YouTubeSearchResult[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [showThemeModal, setShowThemeModal] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentTheme = THEMES[roomState.theme] || THEMES.wurlitzer;
 
   // Load smart suggestions
   const fetchSmartSuggestions = async () => {
@@ -92,10 +100,10 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (searchQuery.trim().length >= 3) {
+    if (searchQuery.trim().length >= 2) {
       searchTimeoutRef.current = setTimeout(() => {
         performYouTubeSearch(searchQuery);
-      }, 450);
+      }, 400);
     } else {
       setYtSearchResults([]);
     }
@@ -137,7 +145,7 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0704] text-[#f5ebd7] flex flex-col max-w-lg mx-auto pb-20 font-sans">
+    <div className="min-h-screen bg-[#0d0704] text-[#f5ebd7] flex flex-col max-w-lg mx-auto pb-20 font-sans transition-colors duration-500">
       {/* Header móvil estilo Rockola Clásica */}
       <header className="sticky top-0 z-30 border-b-2 border-[#8b6528]/50 bg-gradient-to-r from-[#1c1008] via-[#2a170c] to-[#1c1008] px-4 py-3 shadow-xl">
         <div className="flex items-center justify-between">
@@ -156,16 +164,31 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
             </h1>
           </div>
 
-          {onOpenCast && (
+          <div className="flex items-center gap-1.5">
+            {/* Botón Instalar App Móvil */}
+            <PWAInstallButton />
+
+            {/* BOTÓN CAMBIAR TEMA DESDE EL CELULAR */}
             <button
-              onClick={onOpenCast}
-              className="flex items-center gap-1.5 rounded-lg border border-[#8b6528]/60 bg-[#26150c] px-3 py-1.5 text-xs font-bold text-[#e6ca85] hover:bg-[#3a2012] transition"
-              title="Transmitir a la TV"
+              onClick={() => setShowThemeModal(true)}
+              className="flex items-center gap-1 rounded-lg border border-[#8b6528]/60 bg-[#26150c] px-2 py-1.5 text-xs font-bold text-[#e6ca85] hover:bg-[#3a2012] transition shadow-sm"
+              title="Cambiar diseño visual de la Rockola"
             >
-              <Cast className="h-3.5 w-3.5" />
-              <span>Enviar a TV</span>
+              <Palette className="h-3.5 w-3.5 text-[#d4af37]" />
+              <span className="hidden xs:inline">Tema</span>
             </button>
-          )}
+
+            {onOpenCast && (
+              <button
+                onClick={onOpenCast}
+                className="flex items-center gap-1.5 rounded-lg border border-[#8b6528]/60 bg-[#26150c] px-2.5 py-1.5 text-xs font-bold text-[#e6ca85] hover:bg-[#3a2012] transition"
+                title="Transmitir a la TV"
+              >
+                <Cast className="h-3.5 w-3.5" />
+                <span className="hidden xs:inline">TV</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Barra de control remoto de la TV */}
@@ -221,7 +244,7 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
             }`}
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Sugerencias para ti</span>
+            <span>Sugerencias ({currentTheme.name})</span>
           </button>
         </div>
       </header>
@@ -374,6 +397,18 @@ export const GuestRequestView: React.FC<GuestRequestViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal de selección de tema */}
+      {showThemeModal && (
+        <ThemeModal
+          currentTheme={roomState.theme}
+          onClose={() => setShowThemeModal(false)}
+          onSelectTheme={(t) => {
+            if (onSelectTheme) onSelectTheme(t);
+            setShowThemeModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };

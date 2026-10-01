@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -37,6 +38,8 @@ export interface PlayedSongRecord extends SongItem {
   playCount: number;
 }
 
+export type RockolaTheme = 'wurlitzer' | 'synthwave' | 'jazzclub' | 'studio54' | 'minimal_dark';
+
 export interface RockolaRoomState {
   name: string;
   currentSong: SongItem | null;
@@ -44,6 +47,7 @@ export interface RockolaRoomState {
   queue: SongItem[];
   history: PlayedSongRecord[];
   autoPlayDj: boolean;
+  theme: RockolaTheme;
 }
 
 // Initial state starts blank as requested
@@ -54,12 +58,16 @@ const state: RockolaRoomState = {
   queue: [],
   history: [],
   autoPlayDj: true,
+  theme: 'wurlitzer',
 };
 
 // SSE Listeners
 interface SSEClient {
   id: string;
   res: Response;
+  deviceType: 'tv' | 'mobile';
+  deviceName: string;
+  connectedAt: number;
 }
 let sseClients: SSEClient[] = [];
 
@@ -86,7 +94,16 @@ app.get('/api/stream', (req: Request, res: Response) => {
   res.flushHeaders?.();
 
   const clientId = 'c_' + Math.random().toString(36).substring(2, 9);
-  const client: SSEClient = { id: clientId, res };
+  const deviceType = (req.query.deviceType as 'tv' | 'mobile') || 'tv';
+  const deviceName = (req.query.deviceName as string) || (deviceType === 'tv' ? 'Pantalla TV' : 'Celular');
+
+  const client: SSEClient = {
+    id: clientId,
+    res,
+    deviceType,
+    deviceName,
+    connectedAt: Date.now(),
+  };
   sseClients.push(client);
 
   res.write(`data: ${JSON.stringify(state)}\n\n`);
@@ -94,6 +111,17 @@ app.get('/api/stream', (req: Request, res: Response) => {
   req.on('close', () => {
     sseClients = sseClients.filter((c) => c.id !== clientId);
   });
+});
+
+// GET connected devices in the rockola room
+app.get('/api/devices', (_req: Request, res: Response) => {
+  const devices = sseClients.map((c) => ({
+    id: c.id,
+    type: c.deviceType,
+    name: c.deviceName,
+    connectedAt: c.connectedAt,
+  }));
+  res.json({ devices, total: sseClients.length });
 });
 
 // GET current state
@@ -120,43 +148,52 @@ export function extractYouTubeId(urlOrId: string): string | null {
   return null;
 }
 
-// Scrape YouTube for 1 search term (helper for search and recommendations)
-async function searchYouTube(query: string, maxResults = 10) {
+// Multi-engine resilient YouTube Search
+async function searchYouTube(query: string, maxResults = 15) {
+  const results: Array<{
+    videoId: string;
+    title: string;
+    artist: string;
+    thumbnail: string;
+    duration?: string;
+  }> = [];
+
+  // ENGINE 1: Official YouTube Innertube API (Highly reliable on Cloud/Hostinger/Docker IPs)
   try {
-    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-    const ytResponse = await fetch(searchUrl, {
+    const innertubeRes = await fetch('https://www.youtube.com/youtubei/v1/search', {
+      method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
       },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'WEB',
+            clientVersion: '2.20240101.00.00',
+            hl: 'es',
+            gl: 'MX',
+          },
+        },
+        query,
+      }),
     });
 
-    if (!ytResponse.ok) return [];
-
-    const html = await ytResponse.text();
-    const match = html.match(/var ytInitialData = ({.*?});<\/script>/);
-
-    const results: Array<{
-      videoId: string;
-      title: string;
-      artist: string;
-      thumbnail: string;
-      duration?: string;
-    }> = [];
-
-    if (match && match[1]) {
-      const parsedData = JSON.parse(match[1]);
-      const contents =
-        parsedData.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
+    if (innertubeRes.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = (await innertubeRes.json()) as any;
+      const sections =
+        data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
           ?.contents;
 
-      if (Array.isArray(contents)) {
-        for (const section of contents) {
-          const itemSection = section.itemSectionRenderer?.contents;
-          if (Array.isArray(itemSection)) {
-            for (const item of itemSection) {
-              if (item.videoRenderer && item.videoRenderer.videoId) {
+      if (Array.isArray(sections)) {
+        for (const sec of sections) {
+          const items = sec.itemSectionRenderer?.contents;
+          if (Array.isArray(items)) {
+            for (const item of items) {
+              if (item.videoRenderer?.videoId) {
                 const vr = item.videoRenderer;
                 const vId = vr.videoId;
                 const title =
@@ -166,7 +203,7 @@ async function searchYouTube(query: string, maxResults = 10) {
                 const channel = vr.ownerText?.runs?.[0]?.text || 'YouTube';
                 const duration = vr.lengthText?.simpleText || '';
                 const thumb =
-                  vr.thumbnail?.thumbnails?.[0]?.url ||
+                  vr.thumbnail?.thumbnails?.[vr.thumbnail.thumbnails.length - 1]?.url ||
                   `https://img.youtube.com/vi/${vId}/hqdefault.jpg`;
 
                 results.push({
@@ -184,17 +221,118 @@ async function searchYouTube(query: string, maxResults = 10) {
           if (results.length >= maxResults) break;
         }
       }
+
+      if (results.length > 0) {
+        return results;
+      }
     }
-    return results;
-  } catch (e) {
-    console.warn('searchYouTube error:', e);
-    return [];
+  } catch (err) {
+    console.warn('Innertube search fallback:', err);
   }
+
+  // ENGINE 2: YouTube Web HTML Scraper with Consent Cookie Bypass
+  try {
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    const ytResponse = await fetch(searchUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        Cookie: 'CONSENT=YES+cb.20210328-17-p0.en+FX+478; PREF=tz=UTC&f6=40000000&f7=1;',
+      },
+    });
+
+    if (ytResponse.ok) {
+      const html = await ytResponse.text();
+      const match =
+        html.match(/var ytInitialData = ({.*?});<\/script>/) ||
+        html.match(/window\["ytInitialData"\]\s*=\s*({.*?});<\/script>/);
+
+      if (match && match[1]) {
+        const parsedData = JSON.parse(match[1]);
+        const contents =
+          parsedData.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer
+            ?.contents;
+
+        if (Array.isArray(contents)) {
+          for (const section of contents) {
+            const itemSection = section.itemSectionRenderer?.contents;
+            if (Array.isArray(itemSection)) {
+              for (const item of itemSection) {
+                if (item.videoRenderer && item.videoRenderer.videoId) {
+                  const vr = item.videoRenderer;
+                  const vId = vr.videoId;
+                  const title =
+                    vr.title?.runs?.[0]?.text ||
+                    vr.title?.accessibility?.accessibilityData?.label ||
+                    'Video';
+                  const channel = vr.ownerText?.runs?.[0]?.text || 'YouTube';
+                  const duration = vr.lengthText?.simpleText || '';
+                  const thumb =
+                    vr.thumbnail?.thumbnails?.[0]?.url ||
+                    `https://img.youtube.com/vi/${vId}/hqdefault.jpg`;
+
+                  results.push({
+                    videoId: vId,
+                    title,
+                    artist: channel,
+                    thumbnail: thumb,
+                    duration,
+                  });
+
+                  if (results.length >= maxResults) break;
+                }
+              }
+            }
+            if (results.length >= maxResults) break;
+          }
+        }
+      }
+    }
+
+    if (results.length > 0) {
+      return results;
+    }
+  } catch (e) {
+    console.warn('searchYouTube web scraper error:', e);
+  }
+
+  // ENGINE 3: Public Invidious API instance fallback
+  const invidiousInstances = [
+    'https://inv.nadeko.net',
+    'https://invidious.nerdvpn.de',
+    'https://vid.puffyan.us',
+  ];
+
+  for (const instance of invidiousInstances) {
+    try {
+      const invRes = await fetch(`${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (invRes.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const invData = (await invRes.json()) as any[];
+        if (Array.isArray(invData) && invData.length > 0) {
+          return invData.slice(0, maxResults).map((v) => ({
+            videoId: v.videoId,
+            title: v.title,
+            artist: v.author || 'YouTube',
+            thumbnail: `https://img.youtube.com/vi/${v.videoId}/hqdefault.jpg`,
+            duration: v.lengthSeconds ? `${Math.floor(v.lengthSeconds / 60)}:${v.lengthSeconds % 60}` : '',
+          }));
+        }
+      }
+    } catch {
+      // try next instance
+    }
+  }
+
+  return results;
 }
 
-// LIVE YOUTUBE SEARCH ENDPOINT
-app.get('/api/youtube-search', async (req: Request, res: Response) => {
-  const query = (req.query.q as string || '').trim();
+// LIVE YOUTUBE SEARCH ENDPOINT (Supports both /api/youtube-search and /api/search)
+const handleSearchRequest = async (req: Request, res: Response) => {
+  const query = ((req.query.q as string) || '').trim();
   if (!query) {
     return res.json({ results: [] });
   }
@@ -216,7 +354,10 @@ app.get('/api/youtube-search', async (req: Request, res: Response) => {
 
   const results = await searchYouTube(query, 20);
   return res.json({ results });
-});
+};
+
+app.get('/api/youtube-search', handleSearchRequest);
+app.get('/api/search', handleSearchRequest);
 
 // SMART RECOMMENDATIONS ENDPOINT (Memoria y Sugerencias de Canciones)
 // Analiza las canciones recientes y sugiere canciones similares usando Gemini 2.5 Flash
@@ -229,13 +370,14 @@ app.get('/api/recommendations', async (_req: Request, res: Response) => {
 
   const recentListText = recent.length > 0
     ? recent.map((s) => `"${s.title}" de ${s.artist || 'desconocido'}`).join(', ')
-    : 'Música mexicana clásica, rancheras, mariachi, cumbias de salón y boleros';
+    : 'Grandes éxitos de rock clásico, pop 80s, disco, funk y fiesta';
 
   try {
-    const prompt = `Actúa como el experto curador musical de una rockola clásica mexicana de cantina y reuniones familiares para Don Rafael García.
-Las últimas canciones escuchadas o de preferencia son: ${recentListText}.
-Sugiere 5 canciones mexicanas o latinas clásicas ideales que sigan ese mismo ritmo y ambiente (rancheras, boleros, mariachi o cumbias clásicas).
-Responde ÚNICAMENTE en formato JSON válido como una lista de objetos: [{"title": "Nombre", "artist": "Artista"}]`;
+    const prompt = `Actúa como el experto curador musical de una rockola de fiesta.
+Las últimas canciones escuchadas o seleccionadas son: ${recentListText}.
+Sugiere 5 canciones excelentes y variadas que se adapten a ese ambiente o mantengan la fiesta encendida (pueden ser grandes éxitos de rock clásico, pop 80s/90s, disco, funk, rock en español, salsa o el estilo que más esté sonando).
+Si no hay canciones previas, sugiere 5 himnos fiesteros mundiales de géneros variados.
+Responde ÚNICAMENTE en formato JSON válido como una lista de objetos: [{"title": "Nombre de la Canción", "artist": "Artista"}]`;
 
     const aiResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -259,15 +401,15 @@ Responde ÚNICAMENTE en formato JSON válido como una lista de objetos: [{"title
       }
     }
   } catch (error) {
-    console.warn('Gemini recommendation error, fallback to classical Mexican rotation:', error);
+    console.warn('Gemini recommendation error, fallback to universal classics:', error);
   }
 
-  // Fallback classic recommendations
+  // Fallback universal classic recommendations
   const fallbackQueries = [
-    'Vicente Fernandez Acá Entre Nos',
-    'Juan Gabriel Amor Eterno Bellas Artes',
-    'Los Angeles Azules 17 Años',
-    'Jose Jose El Triste',
+    'Queen Dont Stop Me Now',
+    'Michael Jackson Billie Jean',
+    'Earth Wind and Fire September',
+    'Santana Smooth feat Rob Thomas',
   ];
 
   const resolvedFallback = await Promise.all(
@@ -277,6 +419,89 @@ Responde ÚNICAMENTE en formato JSON válido como una lista de objetos: [{"title
     })
   );
   return res.json({ recommendations: resolvedFallback.filter(Boolean) });
+});
+
+export interface SongTrivia {
+  videoId: string;
+  year: string;
+  album: string;
+  genre: string;
+  curiosity: string;
+  eraStyle: 'vinyl' | 'cassette' | 'modern' | 'party';
+}
+
+const triviaCache = new Map<string, SongTrivia>();
+
+// Dynamic Song Trivia & Thematic Insights
+app.get('/api/song-trivia', async (req: Request, res: Response) => {
+  const { title, artist, videoId } = req.query as { title?: string; artist?: string; videoId?: string };
+  if (!title) {
+    return res.status(400).json({ error: 'Falta título' });
+  }
+
+  const cacheKey = videoId || `${title}_${artist || ''}`;
+  if (triviaCache.has(cacheKey)) {
+    return res.json({ trivia: triviaCache.get(cacheKey) });
+  }
+
+  try {
+    const prompt = `Actúa como enciclopedista y DJ experto de música.
+Para la canción "${title}" del artista o intérprete "${artist || 'desconocido'}":
+Proporciona:
+1. "year": Año o década de lanzamiento (ej. "1978" o "1984").
+2. "album": Nombre del álbum o "Sencillo".
+3. "genre": Género principal (ej. "Rock Clásico", "Disco / Funk", "Pop 80s", "Balada", etc.).
+4. "curiosity": Un dato curioso o anécdota fascinante breve (máximo 2 oraciones en español) sobre la grabación, éxito, letra o impacto de esta canción.
+5. "eraStyle": Uno de estos 4 valores exactos:
+   - "vinyl" (si es de los 50s, 60s, 70s o sonido de acetato clásico)
+   - "cassette" (si es de los 80s o 90s)
+   - "party" (si es funk, disco, salsa, cumbia o dance enérgico)
+   - "modern" (si es de los 2000s en adelante o contemporánea)
+
+Responde ÚNICAMENTE en formato JSON válido:
+{
+  "year": "1978",
+  "album": "Nombre del Álbum",
+  "genre": "Género",
+  "curiosity": "Dato curioso breve...",
+  "eraStyle": "vinyl"
+}`;
+
+    const aiResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+
+    const text = aiResponse.text || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const trivia: SongTrivia = {
+        videoId: videoId || '',
+        year: String(parsed.year || 'Éxito Clásico'),
+        album: String(parsed.album || 'Álbum Legendario'),
+        genre: String(parsed.genre || 'Música Variada'),
+        curiosity: String(parsed.curiosity || 'Uno de los temas más coreados y recordados en fiestas y reuniones.'),
+        eraStyle: ['vinyl', 'cassette', 'party', 'modern'].includes(parsed.eraStyle) ? parsed.eraStyle : 'vinyl',
+      };
+      triviaCache.set(cacheKey, trivia);
+      return res.json({ trivia });
+    }
+  } catch (error) {
+    console.warn('Gemini trivia generation fallback:', error);
+  }
+
+  // Fallback trivia
+  const fallbackTrivia: SongTrivia = {
+    videoId: videoId || '',
+    year: 'Clásico Atemporal',
+    album: 'Grandes Éxitos',
+    genre: 'Música de Fiesta',
+    curiosity: 'Un tema legendario que sigue haciendo cantar y bailar a generaciones enteras.',
+    eraStyle: 'vinyl',
+  };
+  triviaCache.set(cacheKey, fallbackTrivia);
+  return res.json({ trivia: fallbackTrivia });
 });
 
 // Add song to queue
@@ -389,6 +614,18 @@ app.post('/api/settings/autoplay', (req: Request, res: Response) => {
   res.json({ ok: true, autoPlayDj: state.autoPlayDj });
 });
 
+// Update visual theme in real-time
+app.post('/api/theme', (req: Request, res: Response) => {
+  const { theme } = req.body;
+  const validThemes: RockolaTheme[] = ['wurlitzer', 'synthwave', 'jazzclub', 'studio54', 'minimal_dark'];
+  if (validThemes.includes(theme)) {
+    state.theme = theme;
+    broadcastState('theme_changed');
+    return res.json({ ok: true, theme: state.theme });
+  }
+  res.status(400).json({ error: 'Tema no válido' });
+});
+
 // Remove song
 app.delete('/api/queue/:id', (req: Request, res: Response) => {
   const { id } = req.params;
@@ -468,7 +705,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
+    const distPath = fs.existsSync(path.resolve(process.cwd(), 'dist'))
+      ? path.resolve(process.cwd(), 'dist')
+      : path.resolve(__dirname, 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.resolve(distPath, 'index.html'));

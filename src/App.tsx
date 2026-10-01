@@ -4,15 +4,17 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { RockolaRoomState, SongItem } from './types';
+import { RockolaRoomState, SongItem, RockolaTheme } from './types';
 import { RockolaHeader } from './components/RockolaHeader';
 import { YouTubeJukeboxPlayer } from './components/YouTubeJukeboxPlayer';
 import { QueueList } from './components/QueueList';
 import { GuestRequestView } from './components/GuestRequestView';
 import { SearchModal } from './components/SearchModal';
 import { CastModal } from './components/CastModal';
+import { ThemeModal } from './components/ThemeModal';
 import { useTvRemote } from './hooks/useTvRemote';
 import { sounds } from './utils/audioEffects';
+import { THEMES } from './utils/themeStyles';
 
 const DEFAULT_STATE: RockolaRoomState = {
   name: 'Rockola Rafael García',
@@ -21,6 +23,7 @@ const DEFAULT_STATE: RockolaRoomState = {
   queue: [],
   history: [],
   autoPlayDj: true,
+  theme: 'wurlitzer',
 };
 
 export default function App() {
@@ -28,6 +31,7 @@ export default function App() {
   const [mode, setMode] = useState<'tv' | 'guest'>('tv');
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showCastModal, setShowCastModal] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
   const [deviceId, setDeviceId] = useState<string>('');
   const [tvUrl, setTvUrl] = useState<string>('');
 
@@ -67,7 +71,9 @@ export default function App() {
 
     let eventSource: EventSource | null = null;
     try {
-      eventSource = new EventSource('/api/stream');
+      const deviceType = mode === 'guest' ? 'mobile' : 'tv';
+      const deviceName = mode === 'guest' ? 'Celular' : 'Smart TV (Principal)';
+      eventSource = new EventSource(`/api/stream?deviceType=${deviceType}&deviceName=${encodeURIComponent(deviceName)}`);
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -354,8 +360,24 @@ export default function App() {
     }
   }, [roomState.autoPlayDj]);
 
+  // Change theme in real-time
+  const handleSelectTheme = useCallback(async (theme: RockolaTheme) => {
+    try {
+      await fetch('/api/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme }),
+      });
+      setRoomState((prev) => ({ ...prev, theme }));
+    } catch {
+      setRoomState((prev) => ({ ...prev, theme }));
+    }
+  }, []);
+
+  const activeTheme = THEMES[roomState.theme] || THEMES.wurlitzer;
+
   return (
-    <div className="min-h-screen bg-[#0c0806] text-[#f5ebd7] font-sans selection:bg-[#d4af37] selection:text-black">
+    <div className={`min-h-screen ${activeTheme.pageBg} text-[#f5ebd7] font-sans selection:bg-[#d4af37] selection:text-black transition-colors duration-500`}>
       {/* Modo Control Móvil */}
       {mode === 'guest' ? (
         <GuestRequestView
@@ -364,6 +386,7 @@ export default function App() {
           onMoveToTop={handleMoveToTop}
           onPlayPauseToggle={handlePlayPauseToggle}
           onNextSong={handleNextSong}
+          onSelectTheme={handleSelectTheme}
           onOpenCast={() => setShowCastModal(true)}
           onBackToTV={() => setMode('tv')}
         />
@@ -374,9 +397,11 @@ export default function App() {
           <RockolaHeader
             name={roomState.name}
             currentMode={mode}
+            currentTheme={roomState.theme}
             onChangeMode={setMode}
             onOpenSearch={() => setShowSearchModal(true)}
             onOpenCast={() => setShowCastModal(true)}
+            onOpenTheme={() => setShowThemeModal(true)}
             queueCount={roomState.queue.length}
           />
 
@@ -388,6 +413,7 @@ export default function App() {
                 <YouTubeJukeboxPlayer
                   currentSong={roomState.currentSong}
                   isPlaying={roomState.isPlaying}
+                  currentTheme={roomState.theme}
                   onPlayPauseToggle={handlePlayPauseToggle}
                   onNextSong={handleNextSong}
                   onSongEnd={handleNextSong}
@@ -404,6 +430,7 @@ export default function App() {
                     queue={roomState.queue}
                     history={roomState.history}
                     currentSong={roomState.currentSong}
+                    currentTheme={roomState.theme}
                     onRemove={handleRemoveSong}
                     onMoveToTop={handleMoveToTop}
                     onMoveUp={handleMoveUp}
@@ -457,6 +484,15 @@ export default function App() {
         <CastModal
           onClose={() => setShowCastModal(false)}
           tvUrl={tvUrl}
+        />
+      )}
+
+      {/* Modal de Cambio de Tema */}
+      {showThemeModal && (
+        <ThemeModal
+          currentTheme={roomState.theme}
+          onClose={() => setShowThemeModal(false)}
+          onSelectTheme={handleSelectTheme}
         />
       )}
     </div>

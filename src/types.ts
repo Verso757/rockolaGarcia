@@ -1,3 +1,5 @@
+export type RockolaTheme = 'wurlitzer' | 'synthwave' | 'jazzclub' | 'studio54' | 'minimal_dark';
+
 export interface SongItem {
   id: string;
   videoId: string;
@@ -24,4 +26,5 @@ export interface RockolaRoomState {
   queue: SongItem[];
   history: PlayedSongRecord[];
   autoPlayDj: boolean;
+  theme: RockolaTheme;
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SongItem } from '../types';
+import { SongItem, RockolaTheme } from '../types';
 import QRCode from 'qrcode';
 import {
   Play,
@@ -13,10 +13,13 @@ import {
   Cast,
   Disc3,
 } from 'lucide-react';
+import { THEMES } from '../utils/themeStyles';
+import { SongThematicExperience } from './SongThematicExperience';
 
 interface YouTubeJukeboxPlayerProps {
   currentSong: SongItem | null;
   isPlaying: boolean;
+  currentTheme?: RockolaTheme;
   onPlayPauseToggle: (playing: boolean) => void;
   onNextSong: () => void;
   onSongEnd: () => void;
@@ -70,6 +73,7 @@ interface YTPlayerInstance {
 export const YouTubeJukeboxPlayer: React.FC<YouTubeJukeboxPlayerProps> = ({
   currentSong,
   isPlaying,
+  currentTheme = 'wurlitzer',
   onPlayPauseToggle,
   onNextSong,
   onSongEnd,
@@ -77,6 +81,7 @@ export const YouTubeJukeboxPlayer: React.FC<YouTubeJukeboxPlayerProps> = ({
   onOpenCast,
   isHost = true,
 }) => {
+  const theme = THEMES[currentTheme] || THEMES.wurlitzer;
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayerInstance | null>(null);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -299,15 +304,14 @@ export const YouTubeJukeboxPlayer: React.FC<YouTubeJukeboxPlayerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative flex flex-col w-full rounded-2xl overflow-hidden bg-gradient-to-b from-[#241710] via-[#1a0f0a] to-[#120804] border-2 border-[#8b6528]/50 shadow-[0_15px_40px_rgba(0,0,0,0.8)]"
+      className={`relative flex flex-col w-full rounded-2xl overflow-hidden border-2 transition-all duration-500 ${theme.cabinetBg} ${theme.borderColor}`}
     >
-      {/* Moldura superior estilo Rockola Clásica Mexicana con latón pulido */}
-      <div className="relative px-4 py-2 border-b border-[#8b6528]/40 bg-[#160d07] flex items-center justify-between">
+      {/* Moldura superior con estilo dinámico del tema seleccionado */}
+      <div className="relative px-4 py-2 border-b border-[#8b6528]/40 bg-[#160d07]/80 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {/* Remaches de latón */}
-          <span className="h-2 w-2 rounded-full bg-[#c99738] shadow-[0_0_4px_#c99738]" />
-          <span className="font-['Cinzel'] text-xs font-bold tracking-[0.2em] text-[#d4af37] uppercase">
-            Ventana Principal • Discos de Acetato
+          <span className="h-2 w-2 rounded-full bg-[#d4af37] shadow-[0_0_4px_#d4af37]" />
+          <span className={`text-xs font-bold tracking-[0.2em] text-[#d4af37] uppercase ${theme.fontHeader}`}>
+            {theme.name} • Ventana Principal
           </span>
         </div>
 
@@ -315,7 +319,7 @@ export const YouTubeJukeboxPlayer: React.FC<YouTubeJukeboxPlayerProps> = ({
           <span className="text-[10px] font-mono text-[#a8894f] uppercase tracking-wider hidden sm:inline">
             {isPlaying ? '• EN REPRODUCCIÓN •' : '• EN ESPERA •'}
           </span>
-          <span className="h-2 w-2 rounded-full bg-[#c99738] shadow-[0_0_4px_#c99738]" />
+          <span className="h-2 w-2 rounded-full bg-[#d4af37] shadow-[0_0_4px_#d4af37]" />
         </div>
       </div>
 
@@ -479,6 +483,12 @@ export const YouTubeJukeboxPlayer: React.FC<YouTubeJukeboxPlayerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Experiencia Temática Dinámica (Vinilo o Cassette giratorio + Trivia histórica) */}
+      <SongThematicExperience
+        currentSong={currentSong}
+        isPlaying={isPlaying}
+      />
     </div>
   );
 };

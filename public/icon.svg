@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2a140a"/>
+      <stop offset="100%" stop-color="#0a0503"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="50%" stop-color="#d4af37"/>
+      <stop offset="100%" stop-color="#996515"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff007f"/>
+      <stop offset="50%" stop-color="#ffb703"/>
+      <stop offset="100%" stop-color="#00f0ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Circle -->
+  <rect width="512" height="512" rx="100" fill="url(#bg)"/>
+  <rect width="500" height="500" x="6" y="6" rx="94" fill="none" stroke="url(#gold)" stroke-width="8"/>
+
+  <!-- Jukebox Arch Outer -->
+  <path d="M 136 430 L 136 240 A 120 120 0 0 1 376 240 L 376 430 Z" fill="#140b06" stroke="url(#neon)" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Vinyl Record Inside -->
+  <circle cx="256" cy="270" r="85" fill="#111111" stroke="url(#gold)" stroke-width="4"/>
+  <circle cx="256" cy="270" r="70" fill="none" stroke="#222" stroke-width="3"/>
+  <circle cx="256" cy="270" r="55" fill="none" stroke="#222" stroke-width="3"/>
+  <circle cx="256" cy="270" r="38" fill="none" stroke="#222" stroke-width="3"/>
+
+  <!-- Center Label -->
+  <circle cx="256" cy="270" r="28" fill="#d4af37"/>
+  <circle cx="256" cy="270" r="8" fill="#111111"/>
+
+  <!-- Jukebox Speaker Grill -->
+  <rect x="176" y="370" width="160" height="42" rx="8" fill="#221209" stroke="url(#gold)" stroke-width="3"/>
+  <line x1="206" y1="378" x2="206" y2="404" stroke="#d4af37" stroke-width="3" stroke-linecap="round"/>
+  <line x1="231" y1="378" x2="231" y2="404" stroke="#d4af37" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="378" x2="256" y2="404" stroke="#d4af37" stroke-width="3" stroke-linecap="round"/>
+  <line x1="281" y1="378" x2="281" y2="404" stroke="#d4af37" stroke-width="3" stroke-linecap="round"/>
+  <line x1="306" y1="378" x2="306" y2="404" stroke="#d4af37" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Musical Notes -->
+  <path d="M 160 170 Q 150 140 180 130 L 180 180 M 180 180 A 12 12 0 1 1 168 192" fill="#ffd166"/>
+  <path d="M 330 150 Q 320 120 350 110 L 350 160 M 350 160 A 12 12 0 1 1 338 172" fill="#ff007f"/>
+</svg>

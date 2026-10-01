@@ -1,5 +1,5 @@
 import React from 'react';
-import { SongItem } from '../types';
+import { SongItem, PlayedSongRecord, RockolaTheme } from '../types';
 import {
   ListMusic,
   Trash2,
@@ -9,11 +9,13 @@ import {
   Search,
 } from 'lucide-react';
 import { sounds } from '../utils/audioEffects';
+import { THEMES } from '../utils/themeStyles';
 
 interface QueueListProps {
   queue: SongItem[];
-  history: SongItem[];
+  history: PlayedSongRecord[];
   currentSong: SongItem | null;
+  currentTheme?: RockolaTheme;
   onRemove: (songId: string) => void;
   onMoveToTop: (songId: string) => void;
   onMoveUp: (songId: string) => void;
@@ -25,6 +27,7 @@ interface QueueListProps {
 
 export const QueueList: React.FC<QueueListProps> = ({
   queue,
+  currentTheme = 'wurlitzer',
   onRemove,
   onMoveToTop,
   onMoveUp,
@@ -33,6 +36,7 @@ export const QueueList: React.FC<QueueListProps> = ({
   onPlayNow,
   onOpenSearch,
 }) => {
+  const theme = THEMES[currentTheme] || THEMES.wurlitzer;
   // Convert index to jukebox selection code (A-1, A-2, B-1...)
   const getJukeboxCode = (idx: number) => {
     const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -42,12 +46,12 @@ export const QueueList: React.FC<QueueListProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-[#22150e] via-[#1a0f0a] to-[#140804] rounded-2xl border-2 border-[#8b6528]/50 p-3.5 shadow-xl">
+    <div className={`flex flex-col h-full rounded-2xl border-2 p-3.5 shadow-xl transition-all duration-500 ${theme.cabinetBg} ${theme.borderColor}`}>
       {/* Tarjetero Header */}
       <div className="flex items-center justify-between border-b border-[#8b6528]/40 pb-2.5 mb-2.5">
         <div className="flex items-center gap-2">
           <ListMusic className="h-4 w-4 text-[#d4af37]" />
-          <h3 className="font-['Cinzel'] text-xs font-bold text-[#e6ca85] tracking-wider uppercase">
+          <h3 className={`text-xs font-bold text-[#e6ca85] tracking-wider uppercase ${theme.fontHeader}`}>
             Tarjetero de Canciones ({queue.length})
           </h3>
         </div>

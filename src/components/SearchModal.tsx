@@ -75,7 +75,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ history, onClose, onAd
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (searchQuery.trim().length >= 3) {
+    if (searchQuery.trim().length >= 2) {
       searchTimeoutRef.current = setTimeout(() => {
         performSearch(searchQuery);
       }, 400);
