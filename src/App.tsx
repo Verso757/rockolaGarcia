@@ -12,6 +12,7 @@ import { GuestRequestView } from './components/GuestRequestView';
 import { SearchModal } from './components/SearchModal';
 import { CastModal } from './components/CastModal';
 import { ThemeModal } from './components/ThemeModal';
+import { SongCuriousFactsTicker } from './components/SongCuriousFactsTicker';
 import { useTvRemote } from './hooks/useTvRemote';
 import { sounds } from './utils/audioEffects';
 import { THEMES } from './utils/themeStyles';
@@ -472,6 +473,12 @@ export default function App() {
                     {roomState.autoPlayDj ? 'ACTIVO' : 'OFF'}
                   </span>
                 </button>
+
+                {/* Lista de Datos Curiosos que corren automáticamente */}
+                <SongCuriousFactsTicker
+                  currentSong={roomState.currentSong}
+                  isPlaying={roomState.isPlaying}
+                />
               </div>
             </div>
           </main>

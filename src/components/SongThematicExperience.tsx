@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SongItem } from '../types';
-import { Sparkles, Disc3, Info, X, Radio, ChevronUp, ChevronDown } from 'lucide-react';
+import { Sparkles, Disc3 } from 'lucide-react';
 
 interface SongThematicExperienceProps {
   currentSong: SongItem | null;
@@ -21,11 +21,9 @@ export const SongThematicExperience: React.FC<SongThematicExperienceProps> = ({
   isPlaying,
 }) => {
   const [trivia, setTrivia] = useState<SongTrivia | null>(null);
-  const [loadingTrivia, setLoadingTrivia] = useState(false);
-  const [showTriviaCard, setShowTriviaCard] = useState(true);
   const [visualMode, setVisualMode] = useState<'auto' | 'vinyl' | 'cassette' | 'off'>('auto');
 
-  // Fetch trivia when current song changes
+  // Fetch trivia when current song changes to auto-tune vinyl/cassette style
   useEffect(() => {
     if (!currentSong) {
       setTrivia(null);
@@ -34,8 +32,6 @@ export const SongThematicExperience: React.FC<SongThematicExperienceProps> = ({
 
     let isMounted = true;
     const fetchTrivia = async () => {
-      setLoadingTrivia(true);
-      setShowTriviaCard(true);
       try {
         const query = new URLSearchParams({
           title: currentSong.title,
@@ -49,10 +45,8 @@ export const SongThematicExperience: React.FC<SongThematicExperienceProps> = ({
             setTrivia(data.trivia);
           }
         }
-      } catch (err) {
-        console.error('Error fetching trivia:', err);
-      } finally {
-        if (isMounted) setLoadingTrivia(false);
+      } catch {
+        // ignore
       }
     };
 
@@ -208,60 +202,8 @@ export const SongThematicExperience: React.FC<SongThematicExperienceProps> = ({
               Cassette
             </button>
           </div>
-
-          {/* Botón para ver/ocultar tarjeta de trivia */}
-          <button
-            onClick={() => setShowTriviaCard(!showTriviaCard)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-bold transition ${
-              showTriviaCard
-                ? 'border-[#d4af37] bg-[#2d1a0e] text-[#ffd166]'
-                : 'border-[#734e1e]/60 bg-[#170c07] text-[#a88a5b] hover:text-[#e6ca85]'
-            }`}
-            title="Dato curioso sobre la canción"
-          >
-            <Radio className="h-3.5 w-3.5 text-[#d4af37]" />
-            <span className="hidden xs:inline">Dato de la Rola</span>
-            {showTriviaCard ? (
-              <ChevronDown className="h-3 w-3" />
-            ) : (
-              <ChevronUp className="h-3 w-3" />
-            )}
-          </button>
         </div>
       </div>
-
-      {/* 2. TARJETA FLOTANTE DE DATOS CURIOSOS / TRIVIA (OPCIÓN B) */}
-      {showTriviaCard && trivia && (
-        <div className="mt-2 rounded-xl bg-gradient-to-r from-[#1c1008]/95 via-[#2b170c]/95 to-[#1c1008]/95 border-2 border-[#d4af37]/60 p-3.5 text-[#f5ebd7] shadow-[0_10px_25px_rgba(0,0,0,0.8)] backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#d4af37] text-black text-xs font-bold shrink-0">
-                📻
-              </span>
-              <div>
-                <span className="font-['Cinzel'] text-xs font-bold text-[#ffd166] uppercase tracking-wider block">
-                  Historia de la Canción • {trivia.year}
-                </span>
-                <span className="text-[11px] text-[#a88a5b]">
-                  {trivia.genre} • {trivia.album}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowTriviaCard(false)}
-              className="p-1 rounded text-[#a88a5b] hover:text-[#ffd166]"
-              title="Ocultar dato"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <p className="mt-2 text-xs md:text-sm text-[#f5ebd7] font-serif leading-relaxed italic border-l-2 border-[#d4af37] pl-3 py-0.5">
-            "{trivia.curiosity}"
-          </p>
-        </div>
-      )}
     </div>
   );
 };
