@@ -1,0 +1,6 @@
+{
+  "name": "Mi Gran Noche - Rockola Rafael",
+  "description": "Rockola interactiva estilo jukebox con videos de YouTube y código QR para que los invitados agreguen canciones en vivo desde sus teléfonos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
